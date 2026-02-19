@@ -36,7 +36,7 @@ export class AuthController {
     // Cookie segura con refresh token
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      domain: '.mutual-smsv.vercel.app',
+      domain: '.mutualsmsv.com.ar',
       sameSite: 'none', // Para desarrollo local, cambiar a 'none' en producción con HTTPS
       secure: true, // poner true en prod con HTTPS
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
