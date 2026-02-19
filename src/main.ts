@@ -27,7 +27,7 @@ async function bootstrap() {
 
   // Configurar CORS para el frontend
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://mutual-smsv.vercel.app'],
+    origin: ['http://localhost:3000', 'https://mutualsmsv.com.ar'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
     allowedHeaders: [
