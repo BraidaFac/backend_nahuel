@@ -63,7 +63,10 @@ export class FlujosService {
     flujo.nombre = createFlujoDto.nombre;
     flujo.descripcion = createFlujoDto.descripcion;
     flujo.fuerza = fuerza;
-    flujo.tipoPrestamo = createFlujoDto.tipoPrestamo;
+    flujo.tipoPrestamo =
+      createFlujoDto.tipoPrestamo == undefined
+        ? undefined
+        : createFlujoDto.tipoPrestamo;
     flujo.activo = createFlujoDto.activo;
 
     // --- Documentos requeridos ---
@@ -152,7 +155,7 @@ export class FlujosService {
     if (updateFlujoDto.activo !== undefined) {
       flujo.activo = updateFlujoDto.activo;
     }
-    if (updateFlujoDto.tipoPrestamo !== undefined) {
+    if (updateFlujoDto.tipoPrestamo != undefined) {
       const flujos = await this.flujoRepository.find({
         fuerza: {
           id: flujo.fuerza.id,
