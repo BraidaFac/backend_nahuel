@@ -49,6 +49,16 @@ export class TransformationService {
           lookupContext,
           mapping.relationProperty,
         );
+
+        if (transformedValue === undefined) {
+          errors.push({
+            code: 'TRANSFORMATION_ERROR',
+            message: `Valor de ${mapping.targetProperty} no encontrado`,
+            field: mapping.targetProperty,
+            value: capitalizedValue,
+          });
+          continue;
+        }
         transformedData[mapping.targetProperty] = transformedValue!;
       } else {
         transformedData[mapping.targetProperty] = capitalizedValue;
@@ -61,15 +71,18 @@ export class TransformationService {
         rowNumber,
         status: RowProcessingStatus.TRANSFORMATION_ERROR,
         originalData: row,
-        error: errors[0] as {
-          code: string;
-          message: string;
-          field?: string;
-          value?: unknown;
-        }, // Primer error como principal
+        errors: errors, // Primer error como principal
       };
     }
 
+    if (Object.keys(transformedData).length !== mappings.length) {
+      return {
+        rowNumber,
+        status: RowProcessingStatus.MISSING_DATA,
+        originalData: row,
+        errors: ['Faltan Datos Requeridos'], // Primer error como principal
+      };
+    }
     // Validar que el objeto transformado tenga los campos mínimos requeridos
     return {
       rowNumber,

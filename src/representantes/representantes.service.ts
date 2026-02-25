@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Role } from 'src/entities/user.entity';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { PaginatedResult } from '../common/dto/pagination.dto';
 import { Representante } from '../entities/representante.entity';
@@ -72,6 +73,8 @@ export class RepresentantesService {
       ];
     }
 
+    // Excluir admins y managers
+    where.user = { role: { $nin: [Role.ADMIN, Role.MANAGER] } };
     const [representantes, total] =
       await this.representanteRepository.findAndCount(where, {
         populate: ['user'],
@@ -94,7 +97,15 @@ export class RepresentantesService {
   }
 
   async findAll(): Promise<ApiResponseDto<Representante[]>> {
-    const representantes = await this.representanteRepository.findAll();
+    const representantes = await this.representanteRepository.findAll({
+      where: {
+        user: {
+          role: { $nin: [Role.ADMIN, Role.MANAGER] },
+        },
+      },
+      populate: ['user'],
+      orderBy: { createdAt: 'DESC' },
+    });
 
     const result: Representante[] = representantes;
 

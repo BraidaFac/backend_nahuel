@@ -36,9 +36,12 @@ export class AuthController {
     // Cookie segura con refresh token
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      domain: '.mutualsmsv.com.ar',
-      sameSite: 'none', // Para desarrollo local, cambiar a 'none' en producción con HTTPS
-      secure: true, // poner true en prod con HTTPS
+      domain:
+        process.env.NODE_ENV === 'production'
+          ? '.mutualsmsv.com.ar'
+          : undefined,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Para desarrollo local, cambiar a 'none' en producción con HTTPS
+      secure: process.env.NODE_ENV === 'production' ? true : false, // poner true en prod con HTTPS
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
       path: '/', // Importante: especificar el path
     });
@@ -68,9 +71,13 @@ export class AuthController {
     // Limpiar la cookie correctamente
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production' ? true : false,
       path: '/',
+      domain:
+        process.env.NODE_ENV === 'production'
+          ? '.mutualsmsv.com.ar'
+          : 'localhost',
     });
     return { message: 'Logout successful' };
   }

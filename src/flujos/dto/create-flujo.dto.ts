@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -28,6 +28,10 @@ export class CreateFlujoDto {
   fuerza: { id: number };
 
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === '' ? null : (value as TipoPrestamo),
+  )
+  @IsEnum(TipoPrestamo)
   tipoPrestamo?: TipoPrestamo;
 
   @IsBoolean()

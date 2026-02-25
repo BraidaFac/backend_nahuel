@@ -36,6 +36,7 @@ export enum RowProcessingStatus {
   SKIPPED_DB_DUPLICATE = 'SKIPPED_DB_DUPLICATE',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   TRANSFORMATION_ERROR = 'TRANSFORMATION_ERROR',
+  MISSING_DATA = 'MISSING_DATA',
 }
 
 /**
@@ -46,12 +47,7 @@ export interface RowProcessingResult {
   status: RowProcessingStatus;
   originalData: RawFileRow;
   transformedData?: Record<string, string | number | boolean>;
-  error?: {
-    code: string;
-    message: string;
-    field?: string;
-    value?: unknown;
-  };
+  errors?: any[];
 }
 
 /**

@@ -1,5 +1,5 @@
 import { EntityManager } from '@mikro-orm/core';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ImportTemplate } from 'src/entities/import-template.entity';
 import { EstadoLead, Lead } from 'src/entities/lead.entity';
 import { Fuerza } from '../../entities/fuerza.entity';
@@ -21,6 +21,7 @@ export interface BulkInsertResult {
     error: string;
   }>;
   insertTimeMs: number;
+  rowNumber: number;
 }
 
 /**
@@ -55,13 +56,18 @@ export class BulkPersistenceService {
     );
 
     if (validRows.length === 0) {
-      return {
-        insertedCount: 0,
-        failedCount: 0,
-        failures: [],
-        insertTimeMs: Date.now() - startTime,
-      };
+      throw new BadRequestException(
+        'No se encontraron filas válidas para insertar revise el archivo y el template',
+      );
     }
+    rows.forEach((r) => {
+      if (r.status === RowProcessingStatus.MISSING_DATA) {
+        failures.push({
+          rowNumber: r.rowNumber,
+          error: 'Faltan Datos Requeridos',
+        });
+      }
+    });
 
     // Procesar en batches
     for (let i = 0; i < validRows.length; i += batchSize) {
@@ -90,6 +96,7 @@ export class BulkPersistenceService {
       failedCount: failures.length,
       failures,
       insertTimeMs: Date.now() - startTime,
+      rowNumber: rows.length,
     };
   }
 

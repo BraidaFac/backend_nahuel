@@ -63,10 +63,7 @@ export class FlujosService {
     flujo.nombre = createFlujoDto.nombre;
     flujo.descripcion = createFlujoDto.descripcion;
     flujo.fuerza = fuerza;
-    flujo.tipoPrestamo =
-      createFlujoDto.tipoPrestamo == undefined
-        ? undefined
-        : createFlujoDto.tipoPrestamo;
+    flujo.tipoPrestamo = createFlujoDto.tipoPrestamo;
     flujo.activo = createFlujoDto.activo;
 
     // --- Documentos requeridos ---
