@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+import { TipoPaso } from 'src/entities/paso-tramite.entity';
 import { TipoPrestamo } from 'src/entities';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
@@ -58,4 +59,8 @@ export class FilterTramiteDto extends PaginationDto {
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
   pasoId?: number;
+
+  @IsOptional()
+  @IsEnum(TipoPaso)
+  tipoPaso?: TipoPaso;
 }

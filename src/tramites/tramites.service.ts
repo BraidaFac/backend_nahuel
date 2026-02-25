@@ -8,7 +8,10 @@ import {
 } from '@nestjs/common';
 import { createReadStream, existsSync, renameSync } from 'fs';
 import path from 'path';
+import ExcelJS from 'exceljs';
+import { Fuerza } from 'src/entities/fuerza.entity';
 import { PasoTramite, TipoPaso } from 'src/entities/paso-tramite.entity';
+import { Provincia } from 'src/entities/provincia.entity';
 import { User } from 'src/entities/user.entity';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { PaginatedResult } from '../common/dto/pagination.dto';
@@ -224,6 +227,7 @@ export class TramitesService {
       fechaDesde,
       fechaHasta,
       tipoPrestamo,
+      tipoPaso,
     } = filterDto;
     const offset = (page - 1) * limit;
 
@@ -237,9 +241,11 @@ export class TramitesService {
     if (fuerzaId) {
       where.cliente = { fuerza: { id: fuerzaId } };
     }
-    if (estadoId) {
-      // Ahora filtramos por pasoActual en lugar de estadoActual
-      where.pasoActual = { id: estadoId };
+    if (estadoId || tipoPaso) {
+      where.pasoActual = {
+        ...(estadoId && { id: estadoId }),
+        ...(tipoPaso && { tipoPaso }),
+      };
     }
 
     if (clienteId) {
@@ -293,6 +299,199 @@ export class TramitesService {
     };
 
     return ApiResponseDto.success(result);
+  }
+
+  private getTipoPasoLabel(tipoPaso: TipoPaso): string {
+    const labels: Record<TipoPaso, string> = {
+      [TipoPaso.INICIAL]: 'Trámites en Inicio',
+      [TipoPaso.INTERMEDIO]: 'Trámites en Proceso',
+      [TipoPaso.FINAL_EXITOSO]: 'Trámites Entregados',
+      [TipoPaso.FINAL_RECHAZADO]: 'Trámites Rechazados',
+    };
+    return labels[tipoPaso] || tipoPaso;
+  }
+
+  async generateReport(
+    filterDto: FilterTramiteDto,
+    user: User,
+    fechaSolicitud: Date,
+  ): Promise<Buffer> {
+    const { fechaDesde, tipoPaso } = filterDto;
+
+    if (!fechaDesde || !tipoPaso) {
+      throw new BadRequestException(
+        'Para generar el reporte debe especificar al menos Fecha Desde y Estado del trámite',
+      );
+    }
+
+    const {
+      estadoId,
+      clienteId,
+      search,
+      provinciaId,
+      representanteId,
+      fuerzaId,
+      fechaHasta,
+      tipoPrestamo,
+    } = filterDto;
+
+    const where: FilterQuery<Tramite> = {};
+
+    if (tipoPrestamo) where.tipoPrestamo = tipoPrestamo;
+    if (fuerzaId) where.cliente = { fuerza: { id: fuerzaId } };
+    if (estadoId || tipoPaso) {
+      where.pasoActual = {
+        ...(estadoId && { id: estadoId }),
+        ...(tipoPaso && { tipoPaso }),
+      };
+    }
+    if (clienteId) where.cliente = { id: clienteId };
+    if (provinciaId) where.cliente = { provincia: { id: provinciaId } };
+    if (representanteId)
+      where.cliente = { representante: { id: representanteId } };
+    if (fechaDesde || fechaHasta) {
+      where.createdAt = {};
+      if (fechaDesde) where.createdAt.$gte = fechaDesde;
+      if (fechaHasta) where.createdAt.$lte = fechaHasta;
+    }
+    if (search) {
+      where.$or = [
+        { cliente: { fullName: { $ilike: `%${search.toLowerCase()}%` } } },
+        { cliente: { email: { $ilike: `%${search.toLowerCase()}%` } } },
+        { observaciones: { $ilike: `%${search.toLowerCase()}%` } },
+      ];
+    }
+
+    const tramites = await this.tramiteRepository.find(where, {
+      populate: ['cliente', 'cliente.fuerza', 'cliente.provincia', 'pasoActual'],
+      orderBy: { createdAt: 'ASC' },
+    });
+
+    const filtrosTexto: string[] = [];
+    filtrosTexto.push(`Fecha Desde: ${fechaDesde.toLocaleDateString('es-AR')}`);
+    filtrosTexto.push(`Estado: ${this.getTipoPasoLabel(tipoPaso)}`);
+    if (fechaHasta)
+      filtrosTexto.push(`Fecha Hasta: ${fechaHasta.toLocaleDateString('es-AR')}`);
+    if (tipoPrestamo) filtrosTexto.push(`Tipo Préstamo: ${tipoPrestamo}`);
+    if (fuerzaId) {
+      const fuerza = await this.em.findOne(Fuerza, { id: fuerzaId });
+      if (fuerza) filtrosTexto.push(`Fuerza: ${fuerza.nombre}`);
+    }
+    if (provinciaId) {
+      const provincia = await this.em.findOne(Provincia, { id: provinciaId });
+      if (provincia) filtrosTexto.push(`Provincia: ${provincia.nombre}`);
+    }
+    if (search) filtrosTexto.push(`Búsqueda: ${search}`);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Reporte Trámites', {
+      pageSetup: { paperSize: 9, orientation: 'landscape' },
+    });
+
+    const styles = {
+      titleBg: {
+        type: 'pattern' as const,
+        pattern: 'solid' as const,
+        fgColor: { argb: 'FF2E5090' },
+      },
+      sectionBg: {
+        type: 'pattern' as const,
+        pattern: 'solid' as const,
+        fgColor: { argb: 'FFD6DCE4' },
+      },
+      headerBg: {
+        type: 'pattern' as const,
+        pattern: 'solid' as const,
+        fgColor: { argb: 'FF4472C4' },
+      },
+      whiteFont: { argb: 'FFFFFFFF' },
+    };
+
+    let rowNum = 1;
+    const titleCell = sheet.getCell(`A${rowNum}`);
+    titleCell.value = 'Reporte de Trámites';
+    titleCell.font = { bold: true, size: 18, color: styles.whiteFont };
+    titleCell.fill = styles.titleBg;
+    titleCell.alignment = { vertical: 'middle' };
+    sheet.mergeCells(`A${rowNum}:F${rowNum}`);
+    sheet.getRow(rowNum).height = 28;
+    rowNum += 2;
+
+    const filtrosLabelCell = sheet.getCell(`A${rowNum}`);
+    filtrosLabelCell.value = 'Filtros aplicados:';
+    filtrosLabelCell.font = { bold: true, size: 12 };
+    filtrosLabelCell.fill = styles.sectionBg;
+    rowNum++;
+    filtrosTexto.forEach((txt) => {
+      sheet.getCell(`A${rowNum}`).value = txt;
+      sheet.getCell(`A${rowNum}`).font = { size: 11 };
+      rowNum++;
+    });
+    rowNum++;
+
+    sheet.getCell(`A${rowNum}`).value = `Solicitado por: ${user.username}`;
+    sheet.getCell(`A${rowNum}`).font = { bold: true, size: 11 };
+    rowNum++;
+    sheet.getCell(`A${rowNum}`).value = `Fecha de solicitud: ${fechaSolicitud.toLocaleString('es-AR')}`;
+    sheet.getCell(`A${rowNum}`).font = { bold: true, size: 11 };
+    rowNum++;
+    const countCell = sheet.getCell(`A${rowNum}`);
+    countCell.value = `Cantidad de trámites: ${tramites.length}`;
+    countCell.font = { bold: true, size: 12 };
+    countCell.fill = styles.sectionBg;
+    rowNum += 2;
+
+    const headers = [
+      'Fecha Creación',
+      'Nombre Cliente',
+      'Matrícula',
+      'Fuerza',
+      'Teléfono',
+      'Monto Solicitado',
+    ];
+    sheet.addRow(headers);
+    const headerRow = sheet.getRow(rowNum);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, size: 11, color: styles.whiteFont };
+      cell.fill = styles.headerBg;
+      cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    });
+    headerRow.height = 22;
+    rowNum++;
+
+    tramites.forEach((t) => {
+      const fechaCreacion = t.createdAt
+        ? new Date(t.createdAt).toLocaleDateString('es-AR')
+        : '';
+      const nombreCliente = t.cliente?.fullName || '';
+      const matricula = t.cliente?.matricula || '';
+      const fuerza = t.cliente?.fuerza?.nombre || '';
+      const telefono = t.cliente?.telefono || '';
+      const monto =
+        t.montoSolicitado != null
+          ? Number(t.montoSolicitado).toLocaleString('es-AR')
+          : '';
+      sheet.addRow([
+        fechaCreacion,
+        nombreCliente,
+        matricula,
+        fuerza,
+        telefono,
+        monto,
+      ]);
+    });
+
+    sheet.columns = [
+      { width: 12 },
+      { width: 30 },
+      { width: 15 },
+      { width: 20 },
+      { width: 18 },
+      { width: 15 },
+    ];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   async findOne(id: number): Promise<ApiResponseDto<Tramite>> {

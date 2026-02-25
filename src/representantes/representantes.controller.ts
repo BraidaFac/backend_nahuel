@@ -6,6 +6,7 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../entities/user.entity';
+import { CreateRepresentanteDto } from './dto/create-representante.dto';
 import { FilterRepresentanteDto } from './dto/filter-representante.dto';
 import { UpdateRepresentanteDto } from './dto/update-representante.dto';
 import { RepresentantesService } from './representantes.service';
@@ -52,6 +54,11 @@ export class RepresentantesController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.representantesService.findOne(id);
+  }
+
+  @Post()
+  create(@Body() createRepresentanteDto: CreateRepresentanteDto) {
+    return this.representantesService.create(createRepresentanteDto);
   }
 
   @Patch(':id')

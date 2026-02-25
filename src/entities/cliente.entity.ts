@@ -38,11 +38,11 @@ export class Cliente extends BaseEntity {
   @ManyToOne(() => Provincia, { nullable: true })
   provincia?: Provincia;
 
-  @ManyToOne(() => Representante, { nullable: true })
+  @ManyToOne(() => Representante, { nullable: true, deleteRule: 'set null' })
   representante?: Representante;
 
-  @ManyToOne(() => Representante)
-  createdBy: Representante;
+  @ManyToOne(() => Representante, { nullable: true, deleteRule: 'set null' })
+  createdBy?: Representante;
 
   @ManyToOne(() => Fuerza, { nullable: false })
   fuerza: Fuerza;

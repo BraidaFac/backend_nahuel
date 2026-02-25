@@ -10,4 +10,10 @@ export class CreateRepresentanteDto {
   @IsString()
   @IsOptional()
   telefono?: string;
+
+  @IsString()
+  password: string;
+
+  @IsString()
+  username: string;
 }

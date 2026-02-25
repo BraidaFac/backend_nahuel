@@ -20,9 +20,7 @@ export class Representante extends BaseEntity {
   @Property({ nullable: true })
   telefono?: string;
 
-  @OneToMany(() => Cliente, (cliente) => cliente.representante, {
-    orphanRemoval: true,
-  })
+  @OneToMany(() => Cliente, (cliente) => cliente.representante)
   clientes = new Collection<Cliente>(this);
 
   @OneToOne(() => User, (user) => user.representante, {

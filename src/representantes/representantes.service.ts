@@ -1,18 +1,15 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { Role } from 'src/entities/user.entity';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { Role, User } from 'src/entities/user.entity';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { PaginatedResult } from '../common/dto/pagination.dto';
 import { Representante } from '../entities/representante.entity';
+import { CreateRepresentanteDto } from './dto/create-representante.dto';
 import { FilterRepresentanteDto } from './dto/filter-representante.dto';
 import { UpdateRepresentanteDto } from './dto/update-representante.dto';
 
-@Injectable()
 export class RepresentantesService {
   constructor(
     private readonly em: EntityManager,
@@ -20,32 +17,46 @@ export class RepresentantesService {
     private representanteRepository: EntityRepository<Representante>,
   ) {}
 
-  /* async create(
+  async create(
     createRepresentanteDto: CreateRepresentanteDto,
   ): Promise<ApiResponseDto<Representante>> {
-    const existingRepresentante = await this.representanteRepository.findOne({
-      email: createRepresentanteDto.email,
-    });
+    const where: FilterQuery<Representante> = {
+      $or: [
+        { email: createRepresentanteDto.email },
+        { user: { username: createRepresentanteDto.username } },
+      ],
+    };
+    const existingRepresentante = await this.representanteRepository.findOne(
+      where,
+      { populate: ['user'] },
+    );
 
     if (existingRepresentante) {
-      throw new ConflictException('Ya existe un representante con ese email');
+      throw new ConflictException(
+        'Ya existe un representante con ese email o username',
+      );
     }
-
-    const representante = this.em.create(Representante, {
-      ...createRepresentanteDto,
-      user: {
-      createdAt: new Date(),
-    });
-
-    await this.representanteRepository
-      .getEntityManager()
-      .persistAndFlush(representante);
-
-    return ApiResponseDto.success(
-      representante,
-      'Representante creado exitosamente',
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(
+      createRepresentanteDto.password,
+      saltRounds,
     );
-  } */
+
+    // Crear usuario
+    const user = new User();
+    user.username = createRepresentanteDto.username;
+    user.email = createRepresentanteDto.email;
+    user.passwordHash = passwordHash;
+    user.role = Role.REPRESENTANTE;
+    user.representante = new Representante();
+    user.representante.fullName = createRepresentanteDto.fullName;
+    user.representante.email = createRepresentanteDto.email;
+    user.representante.telefono = createRepresentanteDto.telefono;
+
+    await this.em.persistAndFlush(user);
+
+    return ApiResponseDto.success(user.representante);
+  }
 
   async findAllPaginated(
     filterDto: FilterRepresentanteDto,
@@ -53,9 +64,7 @@ export class RepresentantesService {
     const { page = 1, limit = 10, fullName, email, search } = filterDto;
     const offset = (page - 1) * limit;
 
-    // Construir filtros
     const where: FilterQuery<Representante> = {};
-
     if (fullName) {
       where.fullName = { $ilike: `%${fullName.toLowerCase()}%` };
     }
@@ -134,22 +143,19 @@ export class RepresentantesService {
     }
 
     // Verificar si el email ya existe en otro representante
-    if (updateRepresentanteDto.email) {
-      const existingRepresentante = await this.representanteRepository.findOne({
-        email: updateRepresentanteDto.email,
-        id: { $ne: id },
-      });
 
-      if (existingRepresentante) {
-        throw new ConflictException(
-          'Ya existe otro representante con ese email',
-        );
-      }
+    if (updateRepresentanteDto.password) {
+      const saltRounds = 10;
+      const passwordHash = await bcrypt.hash(
+        updateRepresentanteDto.password,
+        saltRounds,
+      );
+      representante.user.passwordHash = passwordHash;
     }
 
-    this.representanteRepository.assign(representante, updateRepresentanteDto);
+    this.em.assign(representante.user, updateRepresentanteDto);
 
-    await this.em.persistAndFlush(representante);
+    await this.em.persistAndFlush(representante.user);
 
     // Cargar relaciones para la respuesta
     await this.representanteRepository.populate(representante, ['user']);
@@ -168,13 +174,6 @@ export class RepresentantesService {
 
     if (!representante) {
       throw new NotFoundException('Representante no encontrado');
-    }
-
-    // Verificar si tiene clientes asociados
-    if (representante.clientes.length > 0) {
-      throw new ConflictException(
-        'No se puede eliminar el representante porque tiene clientes asociados',
-      );
     }
 
     await this.em.removeAndFlush(representante);

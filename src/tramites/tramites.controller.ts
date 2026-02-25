@@ -77,6 +77,26 @@ export class TramitesController {
     return this.tramitesService.getEstadisticas(query);
   }
 
+  @Get('report')
+  async getReport(
+    @Query() filterDto: FilterTramiteDto,
+    @Req() request: RequestWithUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const buffer = await this.tramitesService.generateReport(
+      filterDto,
+      request.user,
+      new Date(),
+    );
+    const filename = `reporte-tramites-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    return new StreamableFile(buffer);
+  }
+
   @Get()
   findAll(@Query() filterDto: FilterTramiteDto) {
     console.log('filterDto', filterDto);

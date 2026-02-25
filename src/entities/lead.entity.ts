@@ -20,7 +20,7 @@ export class Lead extends BaseEntity {
   @ManyToOne(() => Provincia, { nullable: true })
   provincia?: Provincia;
 
-  @ManyToOne(() => Representante, { nullable: true })
+  @ManyToOne(() => Representante, { nullable: true, deleteRule: 'set null' })
   representante?: Representante;
 
   @ManyToOne(() => Fuerza, { nullable: true })
